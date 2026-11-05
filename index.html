@@ -52,12 +52,26 @@ function photoInput(i){return `<label>Photo de la question (facultatif)<input ty
 async function imageData(file){if(!file)return '';if(!file.type.startsWith('image/'))throw Error('Sélectionne une image.');const img=await createImageBitmap(file);const scale=Math.min(1,700/img.width,700/img.height);const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.width*scale));canvas.height=Math.max(1,Math.round(img.height*scale));canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);img.close();const data=canvas.toDataURL('image/jpeg',.65);if(data.length>160000)throw Error('Photo trop grande : choisis une image plus petite.');return data}
 function validQuiz(raw){const title=String(raw.title??raw.titre??'').trim();const duration=Number(raw.duration??raw.duree??0),coef=Number(raw.coef??raw.coefficient??1);if(!title||!Array.isArray(raw.questions)||!raw.questions.length||raw.questions.length>40)throw Error('Titre et 1 à 40 questions obligatoires.');if(!Number.isFinite(duration)||duration<0||duration>180||!Number.isFinite(coef)||coef<=0)throw Error('Durée ou coefficient invalide.');const questions=raw.questions.map((q,i)=>{const text=String(q.text??q.question??'').trim(),opts=q.opts??q.choix??q.options,correct=Number(q.correct??q.reponse),points=Number(q.points??2),image=q.image??'';if(!text||!Array.isArray(opts)||opts.length!==4||opts.some(o=>!String(o).trim())||!Number.isInteger(correct)||correct<0||correct>3||!Number.isFinite(points)||points<=0||typeof image!=='string'||(image&&!image.startsWith('data:image/')))throw Error('Question '+(i+1)+' invalide (4 choix, réponse 0 à 3, points positifs).');return {text,opts:opts.map(String),correct,points,image}});return {id:uid(),title,duration,coef,questions}}
 
-function deleteGrade(id){
- if(!prof()||!confirm('Supprimer définitivement cette note ?'))return;
- const g=state.grades.find(x=>x.id===id);
- state.grades=state.grades.filter(x=>x.id!==id);
- if(g?.quizId)state.results=state.results.filter(x=>x.quizId!==g.quizId);
- save();render();
+async function deleteGrade(id){
+ if(!prof())return;
+ const g=state.grades.find(x=>String(x.id)===String(id));
+ if(!g){alert('Cette note est introuvable. Actualise la page.');return}
+ if(!confirm('Supprimer définitivement la note « '+g.title+' » ?'))return;
+ if(!cloudOK||!cloudWrite){alert('Impossible de supprimer : Firebase n’est pas connecté.');return}
+ const before=structuredClone(state);
+ const next=structuredClone(state);
+ next.grades=next.grades.filter(x=>String(x.id)!==String(id));
+ if(g.quizId)next.results=next.results.filter(x=>x.quizId!==g.quizId);
+ try{
+   await cloudWrite(next);
+   state=next;
+   render();
+   alert('Note supprimée et enregistrée sur Firebase.');
+ }catch(err){
+   state=before;
+   render();
+   alert('Suppression impossible : '+(err?.message||err)+'. Vérifie les règles Firestore.');
+ }
 }
 function home(){let a=avgPublished();$('content').innerHTML=`<div class="card"><span class="pill">🇩🇿 SCIENCES ALGÉRIENNES</span><h2 style="margin:13px 0 5px">Bienvenue ${prof()?'M. El Sahraoui':'Isaac'} !</h2><p class="muted">Votre espace de cours et d'évaluations en ligne.</p></div><div class="grid"><div class="card"><div class="small muted">Cours</div><h2>${state.courses.length}</h2></div><div class="card"><div class="small muted">Évaluations</div><h2>${state.quizzes.length}</h2></div><div class="card"><div class="small muted">Notes</div><h2>${state.grades.length}</h2></div><div class="card"><div class="small muted">Moyenne générale · mise à jour à minuit</div><h2>${a===null?'—':fmt(a)+'/20'}</h2></div></div><div class="card"><h3>Notre classe</h3><p><b>Professeur :</b> M. El Sahraoui</p><p><b>Élève :</b> Isaac</p><p><b>Matière :</b> Sciences algériennes</p></div>`}
 function courses(){$('content').innerHTML=`${prof()?`<div class="card"><h2>Publier un cours</h2><form id="courseForm"><label>Titre<input id="courseTitle" required maxlength="120" placeholder="La géographie de l'Algérie"></label><label>Contenu du cours<textarea id="courseText" required placeholder="Écrivez le cours ici…"></textarea></label><button class="primary">Publier le cours</button></form></div>`:''}<div class="card"><h2>Cours en ligne</h2>${state.courses.length?state.courses.slice().reverse().map(c=>`<article class="item"><div class="row between"><b>${escapeHTML(c.title)}</b>${prof()?`<button class="red" onclick="delCourse('${c.id}')">Supprimer</button>`:''}</div><p style="white-space:pre-wrap;margin-top:12px">${escapeHTML(c.text)}</p></article>`).join(''):'<div class="empty">Aucun cours publié.</div>'}</div>`;if(prof())$('courseForm').onsubmit=e=>{e.preventDefault();state.courses.push({id:uid(),title:$('courseTitle').value.trim(),text:$('courseText').value.trim()});save();courses()}}
