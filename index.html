@@ -11,6 +11,9 @@
 .timetable-lesson{background:var(--course);border-radius:8px;padding:10px 7px;margin:6px 0;font-size:12px;overflow-wrap:anywhere;display:grid;gap:5px;color:#172b39}
 .timetable-lesson.cancelled{background:#eee;color:#444}.timetable-lesson.cancelled strong{color:#aa3240}
 .timetable-actions{display:grid;gap:4px}.timetable-actions button{font-size:10px;min-height:28px;padding:5px}.timetable-empty{color:#a4acb5;font-size:12px;text-align:center;padding:25px 0}
+</style><style>
+.grade-entry{position:relative;flex-wrap:wrap;padding-bottom:14px!important}
+.new-grade-line{height:4px;background:#1777ee;border-radius:5px;flex:0 0 100%;margin-top:5px;align-self:end;box-shadow:0 0 0 1px rgba(23,119,238,.08)}
 </style></head><body>
 <section class="login" id="login"><div class="card"><div class="brand">Mini <span>Scolia</span> 🇩🇿</div><p class="muted">Sciences algériennes · Une classe, un élève</p><h2>Connexion</h2><form id="loginForm"><label>Identifiant<input id="loginId" placeholder="Votre identifiant" autocomplete="username" required></label><button class="primary" style="width:100%">Se connecter</button><p id="loginError" style="color:#b32d45" role="alert"></p></form><p class="small muted">Identifiants de démonstration : <code>elsahraoui</code> et <code>isaac</code>.</p><p class="small muted" style="margin-top:18px">Accès de démonstration avec identifiant uniquement. Ne pas utiliser pour des données scolaires réelles.</p></div></section>
 <div class="app" id="app"><aside class="side"><div class="brand">Mini <span>Scolia</span></div><p class="small muted">Sciences algériennes</p><nav id="sideNav"></nav></aside><main class="main"><header class="top"><div><h1 id="pageTitle">Accueil</h1><div id="subtitle" class="small muted"></div></div><button class="outline" onclick="logout()">Quitter</button></header><div id="sync" class="notice warning">Connexion Firebase en cours…</div><section id="content"></section></main><nav class="bottom" id="bottomNav"></nav></div>
@@ -21,7 +24,18 @@ const released=g=>prof()||!g.publishedAt||Date.now()>=g.publishedAt+20*60000;
 const avgPublished=()=>state.dailyAverage?.value??null;
 const avgText=()=>state.dailyAverage?.date?'Moyenne calculée le '+state.dailyAverage.date:'Premier calcul à minuit';
 const fmt=n=>Number(n).toLocaleString('fr-FR',{maximumFractionDigits:2});const color=n=>n>=16?'green':n>=12?'blue':n>=10?'yellow':'redgrade';
-$('loginForm').onsubmit=e=>{e.preventDefault();const id=$('loginId').value.trim().toLowerCase();if(id==='elsahraoui')loginAs('prof');else if(id==='isaac')loginAs('eleve');else $('loginError').textContent='Identifiant inconnu.'};function loginAs(r){role=r;$('login').classList.add('hidden');$('app').classList.add('on');$('subtitle').textContent=(prof()?'M. El Sahraoui · Professeur':'Isaac · Élève')+' · Sciences algériennes';go('accueil')};function logout(){if(qTimer)clearInterval(qTimer);qTimer=null;role='';$('app').classList.remove('on');$('login').classList.remove('hidden')};function go(t){if(qTimer)clearInterval(qTimer);qTimer=null;tab=t;doing=null;const nav=tabs.map(([k,ico,label])=>`<button class="${k===t?'active':''}" onclick="go('${k}')"><b>${ico}</b>${label}</button>`).join('');$('sideNav').innerHTML=nav;$('bottomNav').innerHTML=nav;$('pageTitle').textContent=tabs.find(x=>x[0]===t)[2];render()};function render(){if(!role)return;if(tab==='accueil')home();if(tab==='cours')courses();if(tab==='eval')quizzes();if(tab==='bulletin')bulletin();if(tab==='emploi')schedulePage()};function save(){if(!cloudOK||!cloudWrite){alert('Firebase indisponible : modification non enregistrée. Vérifie les règles Firestore.');return false}cloudWrite(JSON.parse(JSON.stringify(state))).catch(e=>{alert('Échec de sauvegarde Firebase : '+e.message)});return true};function updateMidnightAverage(){
+$('loginForm').onsubmit=e=>{e.preventDefault();const id=$('loginId').value.trim().toLowerCase();if(id==='elsahraoui')loginAs('prof');else if(id==='isaac')loginAs('eleve');else $('loginError').textContent='Identifiant inconnu.'};function loginAs(r){role=r;$('login').classList.add('hidden');$('app').classList.add('on');$('subtitle').textContent=(prof()?'M. El Sahraoui · Professeur':'Isaac · Élève')+' · Sciences algériennes';go('accueil')};function logout(){if(qTimer)clearInterval(qTimer);qTimer=null;role='';$('app').classList.remove('on');$('login').classList.remove('hidden')};function go(t){if(qTimer)clearInterval(qTimer);qTimer=null;tab=t;doing=null;const nav=tabs.map(([k,ico,label])=>`<button class="${k===t?'active':''}" onclick="go('${k}')"><b>${ico}</b>${label}</button>`).join('');$('sideNav').innerHTML=nav;$('bottomNav').innerHTML=nav;$('pageTitle').textContent=tabs.find(x=>x[0]===t)[2];render()};function editingQuiz(){
+ const f=$('quizForm');
+ if(!f||!prof()||tab!=='eval')return false;
+ return [...f.querySelectorAll('input,textarea')].some(el=>
+   (el.type==='checkbox'&&el.checked)||
+   (el.type==='file'&&el.files.length)||
+   (el.dataset.q==='text'&&el.value.trim())||
+   (el.dataset.choice!==undefined&&el.value.trim())||
+   (el.id==='quizTitle'&&el.value.trim())
+ )||f.querySelectorAll('#questionEditor .question').length>1;
+}
+function render(){if(!role)return;if(editingQuiz())return;if(tab==='accueil')home();if(tab==='cours')courses();if(tab==='eval')quizzes();if(tab==='bulletin')bulletin();if(tab==='emploi')schedulePage()};function save(){if(!cloudOK||!cloudWrite){alert('Firebase indisponible : modification non enregistrée. Vérifie les règles Firestore.');return false}cloudWrite(JSON.parse(JSON.stringify(state))).catch(e=>{alert('Échec de sauvegarde Firebase : '+e.message)});return true};function updateMidnightAverage(){
  if(!cloudOK||!cloudWrite)return;
  const today=dayKey();
  if(state.dailyAverage?.date===today)return;
@@ -37,20 +51,29 @@ $('loginForm').onsubmit=e=>{e.preventDefault();const id=$('loginId').value.trim(
  state.dailyAverage={date:today,value:avg()};
  save();render();
 }
-setInterval(()=>{if(!role)return;updateMidnightAverage();if(tab==='eval'||tab==='accueil'||tab==='bulletin')render()},30000);
+setInterval(()=>{if(!role)return;updateMidnightAverage();if(tab==='accueil'||tab==='bulletin'||(tab==='eval'&&!editingQuiz()))render()},30000);
 function status(text,ok=false){$('sync').textContent=text;$('sync').className='notice '+(ok?'':'warning')};
 
 const colors={redgrade:'Non atteints',yellow:'Partiellement atteints',blue:'Atteints',green:'Dépassés'};
 const dots=c=>`<span class="dot ${c}" title="${colors[c]||c}"></span>`;
 const gradeComp=g=>Array.isArray(g.comps)?g.comps:[];
-function showGrade(id){const g=state.grades.find(x=>x.id===id);if(!g)return;const comps=gradeComp(g);$('gradeModal').classList.remove('hidden');$('gradeModalBody').innerHTML=`<div class="card"><h3>${escapeHTML(g.title)}</h3><p><b>Date :</b> ${escapeHTML(g.date||'Non précisée')}<br><b>Note :</b> ${g.score===null?'—':released(g)?fmt(g.score)+'/'+fmt(g.max):'🔒 Disponible 20 minutes après publication'}<br><b>Coefficient :</b> ${fmt(g.coef)}</p></div><div class="card"><h3>Compétences</h3><div class="competence-scroll"><table class="comp-table"><thead><tr><th>Compétence évaluée</th><th>Non atteints</th><th>Partiellement atteints</th><th>Atteints</th><th>Dépassés</th></tr></thead><tbody>${comps.length?comps.map(c=>`<tr><td>${escapeHTML(c.name)}</td>${['redgrade','yellow','blue','green'].map(v=>`<td>${c.color===v?dots(v):''}</td>`).join('')}</tr>`).join(''):'<tr><td colspan="5">Aucune compétence renseignée</td></tr>'}</tbody></table></div></div>`}
+function showGrade(id){const g=state.grades.find(x=>x.id===id);if(!g)return;const comps=gradeComp(g);$('gradeModal').classList.remove('hidden');$('gradeModalBody').innerHTML=`<div class="card"><h3>${escapeHTML(g.title)}</h3><p><b>Date :</b> ${escapeHTML(g.date||'Non précisée')}<br><b>Note :</b> ${g.score===null?'—':released(g)?fmt(g.score)+'/'+fmt(g.max):''}<br><b>Coefficient :</b> ${fmt(g.coef)}</p></div><div class="card"><h3>Compétences</h3><div class="competence-scroll"><table class="comp-table"><thead><tr><th>Compétence évaluée</th><th>Non atteints</th><th>Partiellement atteints</th><th>Atteints</th><th>Dépassés</th></tr></thead><tbody>${comps.length?comps.map(c=>`<tr><td>${escapeHTML(c.name)}</td>${['redgrade','yellow','blue','green'].map(v=>`<td>${c.color===v?dots(v):''}</td>`).join('')}</tr>`).join(''):'<tr><td colspan="5">Aucune compétence renseignée</td></tr>'}</tbody></table></div></div>`}
 function closeGrade(){$('gradeModal').classList.add('hidden')}
-function gradeRow(g){return `<div class="item row between"><button class="grade-link" onclick="showGrade('${g.id}')">${escapeHTML(g.title)}<div class="small muted">${escapeHTML(g.type||'Écrit')} · Coef. ${fmt(g.coef)}</div></button><div class="row">${g.score===null?'<b>—</b>':released(g)?`<span class="grade ${color(g.score/g.max*20)}">${fmt(g.score)}/${fmt(g.max)}</span>`:'<span class="pill">🔒 Note dans 20 min</span>'}${gradeComp(g).map(c=>dots(c.color)).join('')}${prof()?`<button class="red" style="padding:7px 10px;min-height:32px" onclick="deleteGrade('${g.id}')">🗑 Supprimer</button>`:''}</div></div>`}
+function newGradeMarker(g){
+ if(prof()||!g.publishedAt)return '';
+ const elapsed=Date.now()-Number(g.publishedAt);
+ // New competency colors: first 56 minutes. When the score appears at
+ // 20 minutes, start a fresh 56-minute indicator for the score.
+ const newColors=elapsed>=0&&elapsed<56*60000;
+ const newScore=g.score!==null&&g.score!==undefined&&elapsed>=20*60000&&elapsed<76*60000;
+ return newColors||newScore?'<div class="new-grade-line" title="Nouvelle évaluation"></div>':'';
+}
+function gradeRow(g){return `<div class="item row between grade-entry"><button class="grade-link" onclick="showGrade('${g.id}')">${escapeHTML(g.title)}<div class="small muted">${escapeHTML(g.type||'Écrit')} · Coef. ${fmt(g.coef)}</div></button><div class="row">${g.score===null?'<b>—</b>':released(g)?`<span class="grade ${color(g.score/g.max*20)}">${fmt(g.score)}/${fmt(g.max)}</span>`:''}${gradeComp(g).map(c=>dots(c.color)).join('')}${newGradeMarker(g)}${prof()?`<button class="soft" style="padding:7px 10px;min-height:32px" onclick="editGrade('${g.id}')">✏️ Modifier</button><button class="red" style="padding:7px 10px;min-height:32px" onclick="deleteGrade('${g.id}')">🗑 Supprimer</button>`:''}</div></div>`}
 function newCompRow(){const el=document.createElement('div');el.className='item comp-editor';el.innerHTML=`<label>Compétence<input class="comp-name" placeholder="Connaître la géographie algérienne" maxlength="160"></label><label>Résultat<select class="comp-color"><option value="redgrade">🔴 Non atteints</option><option value="yellow">🟡 Partiellement atteints</option><option value="blue" selected>🔵 Atteints</option><option value="green">🟢 Dépassés</option></select></label><button type="button" class="red" onclick="this.parentElement.remove()">Retirer</button>`;$('compEditor').appendChild(el)}
 function collectComps(){return [...document.querySelectorAll('.comp-editor')].map(el=>({name:el.querySelector('.comp-name').value.trim(),color:el.querySelector('.comp-color').value})).filter(c=>c.name)}
 function photoInput(i){return `<label>Photo de la question (facultatif)<input type="file" data-photo="${i}" accept="image/png,image/jpeg,image/webp"></label><div class="small muted" data-preview="${i}"></div>`}
 async function imageData(file){if(!file)return '';if(!file.type.startsWith('image/'))throw Error('Sélectionne une image.');const img=await createImageBitmap(file);const scale=Math.min(1,700/img.width,700/img.height);const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.width*scale));canvas.height=Math.max(1,Math.round(img.height*scale));canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);img.close();const data=canvas.toDataURL('image/jpeg',.65);if(data.length>160000)throw Error('Photo trop grande : choisis une image plus petite.');return data}
-function validQuiz(raw){const title=String(raw.title??raw.titre??'').trim();const duration=Number(raw.duration??raw.duree??0),coef=Number(raw.coef??raw.coefficient??1);if(!title||!Array.isArray(raw.questions)||!raw.questions.length||raw.questions.length>40)throw Error('Titre et 1 à 40 questions obligatoires.');if(!Number.isFinite(duration)||duration<0||duration>180||!Number.isFinite(coef)||coef<=0)throw Error('Durée ou coefficient invalide.');const questions=raw.questions.map((q,i)=>{const text=String(q.text??q.question??'').trim(),opts=q.opts??q.choix??q.options,correct=Number(q.correct??q.reponse),points=Number(q.points??2),image=q.image??'';if(!text||!Array.isArray(opts)||opts.length!==4||opts.some(o=>!String(o).trim())||!Number.isInteger(correct)||correct<0||correct>3||!Number.isFinite(points)||points<=0||typeof image!=='string'||(image&&!image.startsWith('data:image/')))throw Error('Question '+(i+1)+' invalide (4 choix, réponse 0 à 3, points positifs).');return {text,opts:opts.map(String),correct,points,image}});return {id:uid(),title,duration,coef,questions}}
+function validQuiz(raw){const title=String(raw.title??raw.titre??'').trim();const duration=Number(raw.duration??raw.duree??0),coef=Number(raw.coef??raw.coefficient??1);if(!title||!Array.isArray(raw.questions)||!raw.questions.length||raw.questions.length>40)throw Error('Titre et 1 à 40 questions obligatoires.');if(!Number.isFinite(duration)||duration<0||duration>180||!Number.isFinite(coef)||coef<=0)throw Error('Durée ou coefficient invalide.');const questions=raw.questions.map((q,i)=>{const text=String(q.text??q.question??'').trim(),free=String(q.free??q.phraseAcceptee??'').trim(),opts=q.opts??q.choix??q.options,rawCorrect=q.correct??q.reponse,correct=Array.isArray(rawCorrect)?rawCorrect.map(Number):[Number(rawCorrect)],points=Number(q.points??2),image=q.image??'';if(!text||(!free&&(!Array.isArray(opts)||opts.length!==4||opts.some(o=>!String(o).trim())||correct.length<1||correct.some(v=>!Number.isInteger(v)||v<0||v>3)))||!Number.isFinite(points)||points<=0||typeof image!=='string'||(image&&!image.startsWith('data:image/')))throw Error('Question '+(i+1)+' invalide (4 choix, au moins une bonne réponse parmi 0 à 3, points positifs).');return {text,opts:free?[]:opts.map(String),correct:free?[]:correct,free,points,image}});return {id:uid(),title,duration,coef,questions}}
 
 async function deleteGrade(id){
  if(!prof())return;
@@ -73,20 +96,109 @@ async function deleteGrade(id){
    alert('Suppression impossible : '+(err?.message||err)+'. Vérifie les règles Firestore.');
  }
 }
+function editGrade(id){
+ if(!prof())return;
+ const g=state.grades.find(x=>String(x.id)===String(id));if(!g)return;
+ $('gradeEditId').value=g.id;
+ $('gradeTitle').value=g.title||'';
+ $('gradeType').value=g.type||'Écrit';
+ $('gradeScore').value=g.score===null?'':g.score;
+ $('gradeMax').value=g.max||20;
+ $('gradeCoef').value=g.coef||1;
+ $('compEditor').innerHTML='';
+ (g.comps||[]).forEach(c=>{newCompRow();const row=$('compEditor').lastElementChild;row.querySelector('.comp-name').value=c.name;row.querySelector('.comp-color').value=c.color});
+ if(!(g.comps||[]).length)newCompRow();
+ $('gradeFormHeading').textContent='Modifier la note';
+ $('gradeSubmit').textContent='Enregistrer les modifications';
+ $('gradeForm').scrollIntoView({behavior:'smooth',block:'center'});
+}
 function home(){let a=avgPublished();$('content').innerHTML=`<div class="card"><span class="pill">🇩🇿 SCIENCES ALGÉRIENNES</span><h2 style="margin:13px 0 5px">Bienvenue ${prof()?'M. El Sahraoui':'Isaac'} !</h2><p class="muted">Votre espace de cours et d'évaluations en ligne.</p></div><div class="grid"><div class="card"><div class="small muted">Cours</div><h2>${state.courses.length}</h2></div><div class="card"><div class="small muted">Évaluations</div><h2>${state.quizzes.length}</h2></div><div class="card"><div class="small muted">Notes</div><h2>${state.grades.length}</h2></div><div class="card"><div class="small muted">Moyenne générale · mise à jour à minuit</div><h2>${a===null?'—':fmt(a)+'/20'}</h2></div></div><div class="card"><h3>Notre classe</h3><p><b>Professeur :</b> M. El Sahraoui</p><p><b>Élève :</b> Isaac</p><p><b>Matière :</b> Sciences algériennes</p></div>`}
 function courses(){$('content').innerHTML=`${prof()?`<div class="card"><h2>Publier un cours</h2><form id="courseForm"><label>Titre<input id="courseTitle" required maxlength="120" placeholder="La géographie de l'Algérie"></label><label>Contenu du cours<textarea id="courseText" required placeholder="Écrivez le cours ici…"></textarea></label><button class="primary">Publier le cours</button></form></div>`:''}<div class="card"><h2>Cours en ligne</h2>${state.courses.length?state.courses.slice().reverse().map(c=>`<article class="item"><div class="row between"><b>${escapeHTML(c.title)}</b>${prof()?`<button class="red" onclick="delCourse('${c.id}')">Supprimer</button>`:''}</div><p style="white-space:pre-wrap;margin-top:12px">${escapeHTML(c.text)}</p></article>`).join(''):'<div class="empty">Aucun cours publié.</div>'}</div>`;if(prof())$('courseForm').onsubmit=e=>{e.preventDefault();state.courses.push({id:uid(),title:$('courseTitle').value.trim(),text:$('courseText').value.trim()});save();courses()}}
 function delCourse(id){if(!prof()||!confirm('Supprimer ce cours ?'))return;state.courses=state.courses.filter(x=>x.id!==id);save();courses()}
-function quizzes(){if(doing){takeQuiz();return}const results=new Map(state.results.map(x=>[x.quizId,x]));$('content').innerHTML=`${prof()?`<div class="card"><h2>Créer une évaluation en ligne</h2><form id="quizForm"><label>Titre<input id="quizTitle" required placeholder="Histoire de l'Algérie"></label><div class="grid"><label>Temps (minutes, 0 = illimité)<input id="quizDuration" type="number" min="0" max="180" value="15"></label><label>Coefficient<input id="quizCoef" type="number" min="0.25" step="0.25" value="1"></label></div><div id="questionEditor"></div><div class="actions"><button type="button" class="soft" id="addQ">＋ Question</button><button class="primary">Publier</button></div></form></div><div class="card"><h2>Importer une évaluation JSON</h2><p class="small muted">Format : titre, duree, coefficient, questions avec question, choix (4), reponse (0 à 3), points. Les photos peuvent aussi être ajoutées manuellement.</p><textarea id="jsonQuiz" placeholder='{"titre":"Algérie","duree":10,"coefficient":2,"questions":[{"question":"Capitale ?","choix":["Oran","Alger","Sétif","Annaba"],"reponse":1,"points":5}]}'></textarea><button class="soft" id="importQuiz">Importer et publier</button></div>`:''}<div class="card"><h2>Évaluations en ligne</h2>${state.quizzes.length?state.quizzes.slice().reverse().map(q=>{const r=results.get(q.id);return `<div class="item"><div class="row between"><b>${escapeHTML(q.title)}</b><span class="pill">${q.questions.length} question(s)</span></div><p class="small muted">${q.duration?`${q.duration} min · `:'Sans limite · '}Coef. ${fmt(q.coef||1)} · ${fmt(q.questions.reduce((a,x)=>a+x.points,0))} points</p>${r?`<span class="pill">Évaluation rendue</span>`:''}<div class="actions">${prof()?`<button class="soft" onclick="beginQuiz('${q.id}')">Prévisualiser</button><button class="red" onclick="delQuiz('${q.id}')">Supprimer</button>`:r?'':`<button class="primary" onclick="beginQuiz('${q.id}')">Commencer</button>`}</div></div>`}).join(''):'<div class="empty">Aucune évaluation.</div>'}</div>${!prof()?`<div class="card"><h2>Mes notes et compétences</h2>${state.grades.length?state.grades.map(gradeRow).join(''):'<div class="empty">Aucune note.</div>'}</div>`:''}${prof()?`<div class="card"><h2>Notes et compétences</h2><form id="gradeForm"><label>Nom de l'évaluation<input id="gradeTitle" required placeholder="Participation"></label><label>Type<select id="gradeType"><option>Écrit</option><option>Oral</option><option>Pratique</option></select></label><div class="grid"><label>Note (laisser vide pour compétences seules)<input id="gradeScore" type="number" step=".25" min="0"></label><label>Barème<input id="gradeMax" type="number" step=".25" min=".25" value="20" required></label><label>Coefficient<input id="gradeCoef" type="number" step=".25" min=".25" value="1" required></label></div><h3>Compétences colorées</h3><div id="compEditor"></div><button class="soft" type="button" id="addComp">＋ Compétence</button><p style="margin-top:15px"><button class="primary">Publier la note</button></p></form></div>`:''}`;
+function toggleQuizQuestionType(el){
+ const box=el.closest('.question'),free=el.value==='free';
+ box.querySelector('[data-qcm-fields]').style.display=free?'none':'';
+ box.querySelector('[data-free-fields]').style.display=free?'':'none';
+ box.querySelectorAll('[data-choice]').forEach(x=>x.required=!free);
+ box.querySelector('[data-q="free"]').required=free;
+}
+function normalizeAnswer(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim()}
+function editDistance(a,b){
+ const prev=Array.from({length:b.length+1},(_,i)=>i);
+ for(let i=1;i<=a.length;i++){let last=prev[0];prev[0]=i;for(let j=1;j<=b.length;j++){const old=prev[j];prev[j]=Math.min(prev[j]+1,prev[j-1]+1,last+(a[i-1]===b[j-1]?0:1));last=old}}
+ return prev[b.length];
+}
+function freeAnswerCorrect(answer,accepted){
+ const a=normalizeAnswer(answer),b=normalizeAnswer(accepted);
+ if(!a||!b)return false;
+ if(a===b)return true;
+ // Strict on short answers; tolerate small spelling mistakes in longer phrases.
+ if(a.length<8||b.length<8)return editDistance(a,b)<=1;
+ const ratio=editDistance(a,b)/Math.max(a.length,b.length);
+ return ratio<=0.12;
+}
+function quizzes(){if(doing){takeQuiz();return}const results=new Map(state.results.map(x=>[x.quizId,x]));$('content').innerHTML=`${prof()?`<div class="card"><h2>Créer une évaluation en ligne</h2><form id="quizForm"><label>Titre<input id="quizTitle" required placeholder="Histoire de l'Algérie"></label><div class="grid"><label>Temps (minutes, 0 = illimité)<input id="quizDuration" type="number" min="0" max="180" value="15"></label><label>Coefficient<input id="quizCoef" type="number" min="0.25" step="0.25" value="1"></label></div><div id="questionEditor"></div><div class="actions"><button type="button" class="soft" id="addQ">＋ Question</button><button class="primary">Publier</button></div></form></div><div class="card"><h2>Importer une évaluation JSON</h2><p class="small muted">Format : titre, duree, coefficient, questions avec question, choix (4), reponse (0 à 3 ou liste, ex. [0,2,3]), points. Les photos peuvent aussi être ajoutées manuellement.</p><textarea id="jsonQuiz" placeholder='{"titre":"Algérie","duree":10,"coefficient":2,"questions":[{"question":"Capitale ?","choix":["Oran","Alger","Sétif","Annaba"],"reponse":1,"points":5}]}'></textarea><button class="soft" id="importQuiz">Importer et publier</button></div>`:''}<div class="card"><h2>Évaluations en ligne</h2>${state.quizzes.length?state.quizzes.slice().reverse().map(q=>{const r=results.get(q.id);return `<div class="item"><div class="row between"><b>${escapeHTML(q.title)}</b><span class="pill">${q.questions.length} question(s)</span></div><p class="small muted">${q.duration?`${q.duration} min · `:'Sans limite · '}Coef. ${fmt(q.coef||1)} · ${fmt(q.questions.reduce((a,x)=>a+x.points,0))} points</p>${r?`<span class="pill">${r.pending?'À corriger':'Évaluation corrigée'}</span>`:''}<div class="actions">${prof()?`${r?.pending?`<button class="primary" onclick="reviewQuiz('${q.id}')">✍️ Corriger les réponses libres</button>`:''}<button class="soft" onclick="beginQuiz('${q.id}')">Prévisualiser</button><button class="red" onclick="delQuiz('${q.id}')">Supprimer</button>`:r?'':`<button class="primary" onclick="beginQuiz('${q.id}')">Commencer</button>`}</div></div>`}).join(''):'<div class="empty">Aucune évaluation.</div>'}</div>${!prof()?`<div class="card"><h2>Mes notes et compétences</h2>${state.grades.length?state.grades.map(gradeRow).join(''):'<div class="empty">Aucune note.</div>'}</div>`:''}${prof()?`<div class="card"><h2>Notes publiées</h2>${state.grades.length?state.grades.map(gradeRow).join(''):'<div class="empty">Aucune note.</div>'}</div><div class="card"><h2 id="gradeFormHeading">Ajouter une note</h2><form id="gradeForm"><input type="hidden" id="gradeEditId"><label>Nom de l'évaluation<input id="gradeTitle" required placeholder="Participation"></label><label>Type<select id="gradeType"><option>Écrit</option><option>Oral</option><option>Pratique</option></select></label><div class="grid"><label>Note (laisser vide pour compétences seules)<input id="gradeScore" type="number" step=".25" min="0"></label><label>Barème<input id="gradeMax" type="number" step=".25" min=".25" value="20" required></label><label>Coefficient<input id="gradeCoef" type="number" step=".25" min=".25" value="1" required></label></div><h3>Compétences colorées</h3><div id="compEditor"></div><button class="soft" type="button" id="addComp">＋ Compétence</button><p style="margin-top:15px"><button class="primary" id="gradeSubmit">Publier la note</button></p></form></div>`:''}`;
 if(!prof())return;
-let n=0;const add=()=>{const i=n++,el=document.createElement('div');el.className='question';el.innerHTML=`<b>Question ${i+1}</b><label>Énoncé<input data-q="text" required maxlength="300"></label>${photoInput(i)}${[0,1,2,3].map(j=>`<label>Réponse ${j+1}<input data-choice="${j}" required maxlength="180"></label>`).join('')}<div class="grid"><label>Bonne réponse<select data-q="correct">${[0,1,2,3].map(j=>`<option value="${j}">Réponse ${j+1}</option>`).join('')}</select></label><label>Points<input data-q="points" type="number" min=".25" step=".25" value="2" required></label></div>`;$('questionEditor').appendChild(el)};add();$('addQ').onclick=add;
-$('quizForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;if(button)button.disabled=true;try{const qs=[];for(const el of document.querySelectorAll('#questionEditor .question')){const file=el.querySelector('[data-photo]').files[0];qs.push({text:el.querySelector('[data-q="text"]').value.trim(),opts:[...el.querySelectorAll('[data-choice]')].map(x=>x.value.trim()),correct:+el.querySelector('[data-q="correct"]').value,points:+el.querySelector('[data-q="points"]').value,image:await imageData(file)})}const q=validQuiz({title:$('quizTitle').value,duration:$('quizDuration').value,coef:$('quizCoef').value,questions:qs});state.quizzes.push(q);if(save())quizzes()}catch(err){alert(err.message)}finally{if(button)button.disabled=false}};
+let n=0;const add=()=>{const i=n++,el=document.createElement('div');el.className='question';el.innerHTML=`<b>Question ${i+1}</b><label>Énoncé<input data-q="text" required maxlength="300"></label>${photoInput(i)}<label>Type de question<select data-q="kind" onchange="toggleQuizQuestionType(this)"><option value="qcm">QCM</option><option value="free">Réponse libre</option></select></label><div data-qcm-fields>${[0,1,2,3].map(j=>`<label>Réponse ${j+1}<input data-choice="${j}" required maxlength="180"></label>`).join('')}<div class="grid"><div><b>Réponses correctes (coche toutes les bonnes)</b><div>${[0,1,2,3].map(j=>`<label class="choice"><input type="checkbox" data-correct="${j}" style="width:auto"> Réponse ${j+1} correcte</label>`).join('')}</div><button type="button" class="soft" onclick="this.closest('.question').querySelectorAll('[data-correct]').forEach(x=>x.checked=true)">✓ Toutes les réponses sont bonnes</button></div><label>Points<input data-q="points" type="number" min=".25" step=".25" value="2" required></label></div></div><div data-free-fields style="display:none"><label>Phrase acceptée par le professeur<textarea data-q="free" rows="3" placeholder="Exemple : Ahmed Ben Bella est le premier président de l'Algérie."></textarea></label><p class="small muted">Les accents, majuscules, ponctuations et petites fautes d’orthographe sont tolérés. Vérifie manuellement les réponses ambiguës.</p></div>`;$('questionEditor').appendChild(el)};add();$('addQ').onclick=add;
+$('quizForm').onsubmit=async e=>{e.preventDefault();const button=e.submitter;if(button)button.disabled=true;try{const qs=[];for(const el of document.querySelectorAll('#questionEditor .question')){const file=el.querySelector('[data-photo]').files[0];qs.push({text:el.querySelector('[data-q="text"]').value.trim(),opts:[...el.querySelectorAll('[data-choice]')].map(x=>x.value.trim()),correct:[...el.querySelectorAll('[data-correct]:checked')].map(x=>+x.dataset.correct),free:el.querySelector('[data-q="kind"]').value==='free'?el.querySelector('[data-q="free"]').value.trim():'',points:+el.querySelector('[data-q="points"]').value,image:await imageData(file)})}const q=validQuiz({title:$('quizTitle').value,duration:$('quizDuration').value,coef:$('quizCoef').value,questions:qs});state.quizzes.push(q);if(save())quizzes()}catch(err){alert(err.message)}finally{if(button)button.disabled=false}};
 $('importQuiz').onclick=()=>{try{const q=validQuiz(JSON.parse($('jsonQuiz').value));state.quizzes.push(q);if(save())quizzes()}catch(err){alert('JSON invalide : '+err.message)}};
-$('addComp').onclick=newCompRow;newCompRow();$('gradeForm').onsubmit=e=>{e.preventDefault();const score=$('gradeScore').value.trim()===''?null:Number($('gradeScore').value),max=Number($('gradeMax').value),coef=Number($('gradeCoef').value);if((score!==null&&(score<0||score>max))||max<=0||coef<=0){alert('Note ou barème invalide.');return}state.grades.push({id:uid(),title:$('gradeTitle').value.trim(),type:$('gradeType').value,date:new Date().toLocaleDateString('fr-FR'),score,max,coef,comps:collectComps(),publishedAt:Date.now()});if(save())quizzes()};}
+$('addComp').onclick=newCompRow;newCompRow();$('gradeForm').onsubmit=async e=>{
+ e.preventDefault();
+ const score=$('gradeScore').value.trim()===''?null:Number($('gradeScore').value),max=Number($('gradeMax').value),coef=Number($('gradeCoef').value);
+ if((score!==null&&(score<0||score>max))||max<=0||coef<=0){alert('Note ou barème invalide.');return}
+ if(!cloudOK||!cloudWrite){alert('Firebase non connecté.');return}
+ const id=$('gradeEditId').value,old=id?state.grades.find(g=>String(g.id)===id):null;
+ const grade={...(old||{}),id:id||uid(),title:$('gradeTitle').value.trim(),type:$('gradeType').value,date:old?.date||new Date().toLocaleDateString('fr-FR'),score,max,coef,comps:collectComps(),publishedAt:old?.publishedAt||Date.now()};
+ const next=structuredClone(state);
+ if(id){const i=next.grades.findIndex(g=>String(g.id)===id);if(i<0){alert('Note introuvable.');return}next.grades[i]=grade}
+ else next.grades.push(grade);
+ try{await cloudWrite(next);state=next;quizzes();alert(id?'Note modifiée et enregistrée.':'Note publiée.')}
+ catch(err){alert('Enregistrement impossible : '+(err?.message||err))}
+};}
 function beginQuiz(id){doing=state.quizzes.find(q=>q.id===id);if(!doing)return;qDraft=[];qEnd=doing.duration&&!prof()?Date.now()+doing.duration*60000:0;takeQuiz()}
-function takeQuiz(){const q=doing;if(!q)return;const draft=qDraft;$('content').innerHTML=`<div class="card"><span class="pill">ÉVALUATION EN LIGNE</span><h2 style="margin-top:12px">${escapeHTML(q.title)}</h2>${qEnd?'<p class="notice" id="timeLeft">Temps restant…</p>':'<p class="small muted">Sans limite de temps</p>'}<form id="answerForm">${q.questions.map((x,i)=>`<div class="question"><div class="row between"><b>${i+1}. ${escapeHTML(x.text)}</b><span class="pill">${fmt(x.points)} pts</span></div>${x.image?`<img class="question-image" src="${x.image}" alt="Illustration de la question ${i+1}">`:''}${x.opts.map((o,j)=>`<label class="choice"><input type="radio" name="ans${i}" value="${j}" ${draft[i]===j?'checked':''}>${escapeHTML(o)}</label>`).join('')}</div>`).join('')}<div class="actions"><button class="primary">${prof()?'Voir la correction':'Rendre mon évaluation'}</button><button type="button" class="outline" id="cancel">Retour</button></div></form></div>`;
+function takeQuiz(){const q=doing;if(!q)return;const draft=qDraft;$('content').innerHTML=`<div class="card"><span class="pill">ÉVALUATION EN LIGNE</span><h2 style="margin-top:12px">${escapeHTML(q.title)}</h2>${qEnd?'<p class="notice" id="timeLeft">Temps restant…</p>':'<p class="small muted">Sans limite de temps</p>'}<form id="answerForm">${q.questions.map((x,i)=>`<div class="question"><div class="row between"><b>${i+1}. ${escapeHTML(x.text)}</b><span class="pill">${fmt(x.points)} pts</span></div>${x.image?`<img class="question-image" src="${x.image}" alt="Illustration de la question ${i+1}">`:''}${x.free?`<label>Ta réponse<textarea name="free${i}" rows="3" placeholder="Écris ta réponse ici…">${escapeHTML(typeof draft[i]==='string'?draft[i]:'')}</textarea></label>`:x.opts.map((o,j)=>`<label class="choice"><input type="radio" name="ans${i}" value="${j}" ${draft[i]===j?'checked':''}>${escapeHTML(o)}</label>`).join('')}</div>`).join('')}<div class="actions"><button class="primary">${prof()?'Voir la correction':'Rendre mon évaluation'}</button><button type="button" class="outline" id="cancel">Retour</button></div></form></div>`;
 const update=()=>{if(!qEnd)return;const left=Math.max(0,Math.ceil((qEnd-Date.now())/1000));const el=$('timeLeft');if(el)el.textContent='⏱ Temps restant : '+Math.floor(left/60)+':'+String(left%60).padStart(2,'0');if(!left){clearInterval(qTimer);qTimer=null;finishQuiz(true)}};if(qTimer)clearInterval(qTimer);if(qEnd){qTimer=setInterval(update,1000);update()}
 $('cancel').onclick=()=>{if(qTimer)clearInterval(qTimer);qTimer=null;doing=null;quizzes()};$('answerForm').onsubmit=e=>{e.preventDefault();if(confirm('Rendre cette évaluation ?'))finishQuiz(false)};}
-function finishQuiz(expired){const q=doing;if(!q)return;if(qTimer)clearInterval(qTimer);qTimer=null;let earned=0,total=0;q.questions.forEach((x,i)=>{total+=x.points;const a=document.querySelector(`input[name="ans${i}"]:checked`);if(a&&+a.value===x.correct)earned+=x.points});const score=total?20*earned/total:0;if(!prof()){if(state.results.some(r=>r.quizId===q.id)){alert('Évaluation déjà rendue.');doing=null;quizzes();return}state.results.push({quizId:q.id,score});state.grades.push({id:uid(),quizId:q.id,title:q.title,type:'Écrit',date:new Date().toLocaleDateString('fr-FR'),score,max:20,coef:q.coef||1,comps:[],publishedAt:Date.now()});save()}doing=null;quizzes();$('content').insertAdjacentHTML('afterbegin',`<div class="card"><h2>Évaluation rendue</h2><p>Les compétences sont visibles immédiatement. La note sera disponible dans 20 minutes.</p></div>`)}
+function finishQuiz(expired){
+ const q=doing;if(!q)return;
+ if(qTimer)clearInterval(qTimer);qTimer=null;
+ let earned=0,total=0;const answers=[],manual=[];
+ q.questions.forEach((x,i)=>{
+  total+=x.points;
+  if(x.free){
+   const written=document.querySelector(`[name="free${i}"]`)?.value||'';
+   answers[i]=written;manual.push({index:i,answer:written,points:null});
+  }else{
+   const a=document.querySelector(`input[name="ans${i}"]:checked`);
+   answers[i]=a?+a.value:null;
+   if(a&&(Array.isArray(x.correct)?x.correct.includes(+a.value):+a.value===x.correct))earned+=x.points;
+  }
+ });
+ if(!prof()){
+  if(state.results.some(r=>r.quizId===q.id)){alert('Évaluation déjà rendue.');doing=null;quizzes();return}
+  const pending=manual.length>0,score=pending?null:(total?20*earned/total:0);
+  state.results.push({quizId:q.id,score,earned,total,answers,manual,pending,submittedAt:Date.now()});
+  if(!pending)state.grades.push({id:uid(),quizId:q.id,title:q.title,type:'Écrit',date:new Date().toLocaleDateString('fr-FR'),score,max:20,coef:q.coef||1,comps:[],publishedAt:Date.now()});
+  save();
+ }
+ doing=null;quizzes();
+ $('content').insertAdjacentHTML('afterbegin',`<div class="card"><h2>Évaluation rendue</h2><p>${manual.length?'Les réponses libres attendent la correction du professeur.':'La note sera visible après 20 minutes.'}</p></div>`);
+}
+function reviewQuiz(id){
+ if(!prof())return;
+ const q=state.quizzes.find(x=>x.id===id),r=state.results.find(x=>x.quizId===id);
+ if(!q||!r||!r.pending)return;
+ const free=(r.manual||[]);
+ $('content').innerHTML=`<div class="card"><h2>Corriger : ${escapeHTML(q.title)}</h2><p>Les questions QCM sont déjà corrigées automatiquement. Attribue les points aux réponses libres.</p><form id="manualReview">${free.map(m=>{const x=q.questions[m.index];return `<div class="question"><b>Question ${m.index+1} — ${fmt(x.points)} point(s)</b><p>${escapeHTML(x.text)}</p><p><b>Réponse de l'élève :</b> ${escapeHTML(m.answer||'(aucune réponse)')}</p><p class="small muted">Phrase de référence : ${escapeHTML(x.free)}</p><label>Points attribués (sur ${fmt(x.points)})<input type="number" data-review="${m.index}" min="0" max="${x.points}" step="0.25" value="${m.points??''}" required></label></div>`}).join('')}<button class="primary">Valider la correction et publier la note</button><button type="button" class="outline" onclick="quizzes()">Retour</button></form></div>`;
+ $('manualReview').onsubmit=e=>{
+  e.preventDefault();let points=r.earned||0;
+  for(const m of free){const x=q.questions[m.index],v=Number(document.querySelector(`[data-review="${m.index}"]`).value);if(!Number.isFinite(v)||v<0||v>x.points){alert('Points invalides.');return}m.points=v;points+=v}
+  r.score=r.total?20*points/r.total:0;r.pending=false;r.correctedAt=Date.now();
+  state.grades.push({id:uid(),quizId:q.id,title:q.title,type:'Écrit',date:new Date().toLocaleDateString('fr-FR'),score:r.score,max:20,coef:q.coef||1,comps:[],publishedAt:Date.now()});
+  if(save())quizzes();
+ };
+}
+
 function delQuiz(id){if(!prof()||!confirm('Supprimer cette évaluation et ses résultats ?'))return;state.quizzes=state.quizzes.filter(q=>q.id!==id);state.results=state.results.filter(r=>r.quizId!==id);state.grades=state.grades.filter(g=>g.quizId!==id);save();quizzes()}
 
 let weekOffset=0;
@@ -101,18 +213,24 @@ function schedulePage(){
  const days=weekDates(),items=state.schedule||[];
  const cols=days.map((d,i)=>{
   const date=isoDate(d),dayItems=items.filter(x=>x.date===date).sort((a,b)=>a.start.localeCompare(b.start));
-  return `<div class="timetable-day"><div class="timetable-head">${['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'][i]} ${d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}</div>${dayItems.map(x=>`<div class="timetable-lesson ${x.cancelled?'cancelled':''}" style="--course:${escapeHTML(x.color||'#cce8fa')}"><b>${escapeHTML(x.start)} – ${escapeHTML(x.end)}</b><div>${escapeHTML(x.subject)}</div><small>${escapeHTML(x.teacher||'M. El Sahraoui')}</small>${x.cancelled?'<strong>ANNULÉ</strong>':''}${prof()?`<div class="timetable-actions"><button onclick="editLesson('${x.id}')">Modifier / déplacer</button><button class="red" onclick="removeLesson('${x.id}')">Supprimer</button></div>`:''}</div>`).join('')||'<div class="timetable-empty">Aucun cours</div>'}</div>`;
+  return `<div class="timetable-day"><div class="timetable-head">${['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'][i]} ${d.toLocaleDateString('fr-FR',{day:'numeric',month:'short'})}</div>${dayItems.map(x=>`<div class="timetable-lesson ${x.cancelled?'cancelled':''}" style="--course:${escapeHTML(x.color||'#cce8fa')}"><b>${escapeHTML(x.start)} – ${escapeHTML(x.end)}</b><div>${escapeHTML(x.subject)}</div><small>${escapeHTML(x.teacher||'M. El Sahraoui')}</small>${x.cancelled?'<strong>⚠️ ANNULÉ</strong>':x.changed?'<strong title="Cours modifié ou déplacé">⚠️ MODIFIÉ / DÉPLACÉ</strong>':''}${prof()?`<div class="timetable-actions"><button onclick="editLesson('${x.id}')">Modifier / déplacer</button><button class="red" onclick="removeLesson('${x.id}')">Supprimer</button></div>`:''}</div>`).join('')||'<div class="timetable-empty">Aucun cours</div>'}</div>`;
  }).join('');
  $('content').innerHTML=`<div class="card"><div class="row between"><h2>Emploi du temps</h2><div class="row"><button class="outline" onclick="weekOffset=0;schedulePage()">Aujourd'hui</button><button class="outline" onclick="shiftWeek(-1)">‹</button><button class="outline" onclick="shiftWeek(1)">›</button></div></div><p class="muted">${days[0].toLocaleDateString('fr-FR')} – ${days[6].toLocaleDateString('fr-FR')}</p><div class="timetable-scroll"><div class="timetable">${cols}</div></div></div>${prof()?`<div class="card"><h3 id="lessonFormTitle">Ajouter un cours</h3><form id="lessonForm"><input type="hidden" id="lessonId"><label>Matière<input id="lessonSubject" required placeholder="Sciences algériennes"></label><div class="grid"><label>Date<input type="date" id="lessonDate" required value="${isoDate(days[0])}"></label><label>Professeur<input id="lessonTeacher" value="M. El Sahraoui"></label><label>Début<input type="time" id="lessonStart" required value="08:15"></label><label>Fin<input type="time" id="lessonEnd" required value="09:10"></label></div><label>Couleur du cours<select id="lessonColor"><option value="#b8d5ff">Bleu</option><option value="#b9f2cb">Vert</option><option value="#ffe780">Jaune</option><option value="#e1b7f5">Violet</option><option value="#ffb7ba">Rose</option></select></label><label><input id="lessonCancelled" type="checkbox" style="width:auto"> Cours annulé</label><button class="primary">Enregistrer le cours</button></form></div>`:''}`;
- if(prof())$('lessonForm').onsubmit=e=>{
+ if(prof())$('lessonForm').onsubmit=async e=>{
   e.preventDefault();
   const id=$('lessonId').value||uid(),start=$('lessonStart').value,end=$('lessonEnd').value;
   if(end<=start){alert("L'heure de fin doit être après le début.");return}
+  const old=(state.schedule||[]).find(x=>x.id===id);
   const entry={id,subject:$('lessonSubject').value.trim(),teacher:$('lessonTeacher').value.trim(),date:$('lessonDate').value,start,end,color:$('lessonColor').value,cancelled:$('lessonCancelled').checked};
-  state.schedule=state.schedule||[];
-  const index=state.schedule.findIndex(x=>x.id===id);
-  if(index<0)state.schedule.push(entry);else state.schedule[index]=entry;
-  save();schedulePage();
+  entry.changed=!!old&&(!!old.changed||['subject','teacher','date','start','end','color'].some(k=>old[k]!==entry[k]));
+  const next=structuredClone(state);
+  next.schedule=next.schedule||[];
+  const index=next.schedule.findIndex(x=>x.id===id);
+  if(index<0)next.schedule.push(entry);else next.schedule[index]=entry;
+  if(!cloudOK||!cloudWrite){alert('Firebase non connecté : cours non enregistré.');return}
+  try{await cloudWrite(next);state=next;schedulePage();alert('Cours enregistré !'+(entry.changed?' ⚠️ Modification signalée.':''))}
+  catch(err){alert('Impossible d’enregistrer : '+(err?.message||err))}
+
  };
 }
 function editLesson(id){
@@ -124,9 +242,13 @@ function editLesson(id){
  $('lessonFormTitle').textContent='Modifier, déplacer ou annuler le cours';
  $('lessonForm').scrollIntoView({behavior:'smooth',block:'center'});
 }
-function removeLesson(id){
+async function removeLesson(id){
  if(!prof()||!confirm('Supprimer ce cours de l’emploi du temps ?'))return;
- state.schedule=(state.schedule||[]).filter(x=>x.id!==id);save();schedulePage();
+ if(!cloudOK||!cloudWrite){alert('Firebase non connecté.');return}
+ const next=structuredClone(state);
+ next.schedule=(next.schedule||[]).filter(x=>x.id!==id);
+ try{await cloudWrite(next);state=next;schedulePage();alert('Cours supprimé.')}
+ catch(err){alert('Suppression impossible : '+(err?.message||err))}
 }
 
 function bulletin(){const a=avgPublished(),b=state.bulletin;$('content').innerHTML=`<div class="card"><span class="pill">BULLETIN · SCIENCES ALGÉRIENNES</span><h2 style="margin:12px 0">Isaac</h2><p class="small muted">Professeur : M. El Sahraoui</p>${!prof()&&!b.published?'<div class="notice">Le bulletin n’est pas encore publié par le professeur.</div>':`<div class="item row between"><b>Moyenne de la matière</b><span class="grade ${a===null?'blue':color(a)}">${a===null?'—':fmt(a)+'/20'}</span></div><h3>Notes</h3>${state.grades.length?state.grades.map(gradeRow).join(''):'<div class="empty">Pas encore de notes.</div>'}<hr class="hr"><h3>Appréciation</h3><p style="white-space:pre-wrap">${escapeHTML(b.comment||'Aucune appréciation pour le moment.')}</p>`}</div>${prof()?`<div class="card"><h2>Gérer le bulletin</h2><label>Appréciation<textarea id="appreciation">${escapeHTML(b.comment)}</textarea></label><label><input type="checkbox" id="publish" style="width:auto" ${b.published?'checked':''}> Publier le bulletin à Isaac</label><button class="primary" id="saveBulletin">Enregistrer</button></div>`:''}`;if(prof())$('saveBulletin').onclick=()=>{state.bulletin={comment:$('appreciation').value.trim(),published:$('publish').checked};save();bulletin()}}
